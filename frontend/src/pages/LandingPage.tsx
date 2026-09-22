@@ -1,14 +1,13 @@
-import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
   BrainCircuit,
-  MapPinned,
+  Target,
+  Bell,
   ShieldCheck,
-  Network,
 } from "lucide-react";
 
-
+import bg1 from "../assets/bg1.png";
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -16,136 +15,188 @@ export default function LandingPage() {
   const handleEnterDashboard = () => {
     navigate("/app/overview");
   };
+
   return (
-    <div className="min-h-screen overflow-hidden bg-[#F7F9FC] text-slate-900">
-      {/* Background decoration */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-cyan-100/40 blur-3xl" />
-        <div className="absolute -bottom-40 -left-32 h-96 w-96 rounded-full bg-blue-100/40 blur-3xl" />
+    <main className="relative min-h-screen overflow-hidden bg-[#f7f9fc] text-slate-900">
+      {/* Hero background */}
+      <div className="absolute inset-0">
+        <img
+          src={bg1}
+          alt=""
+          className="h-full w-full object-cover object-center"
+        />
+
+        {/* Soft overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-white via-white/25 to-transparent" />
+
+        {/* Bottom fade */}
+        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#f7f9fc]/30 to-transparent" />
+
+        {/* Very subtle wash */}
+        <div className="absolute inset-0 bg-white/8" />
       </div>
 
-      {/* Navbar */}
-      <header className="relative z-10 border-b border-slate-200/70 bg-white/70 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-white">
-              <ShieldCheck size={19} />
+      {/* Hero content */}
+      <section className="relative z-10 flex min-h-screen items-center">
+        <div className="mx-auto w-full max-w-[1400px] px-8 py-20 sm:px-12 lg:px-16">
+          <div className="max-w-[620px]">
+
+            {/* TRACE Logo */}
+            <div className="mb-10 flex items-center">
+              {/* Logo mark */}
+              <svg
+                width="40"
+                height="40"
+                viewBox="0 0 48 48"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="shrink-0"
+              >
+                <path
+                  d="M7 10.5L24 6L41 10.5L24 16L7 10.5Z"
+                  fill="#173BCE"
+                />
+
+                <path
+                  d="M7 10.5V25.5L24 42V16L7 10.5Z"
+                  fill="#315BEA"
+                />
+
+                <path
+                  d="M24 16V42L41 25.5V10.5L24 16Z"
+                  fill="#1E4BDB"
+                />
+
+                <path
+                  d="M15 13.2L24 10.8L33 13.2L24 16L15 13.2Z"
+                  fill="#7C9AFF"
+                />
+              </svg>
+
+              {/* TRACE text */}
+              <div className="ml-3 flex items-center">
+                <span className="text-[25px] font-extrabold tracking-[-0.045em] text-slate-950">
+                  TRACE
+                </span>
+
+                {/* Divider */}
+                <span className="mx-4 h-8 w-px bg-slate-300" />
+
+                {/* Subtitle */}
+                <div className="text-[11px] font-medium leading-[1.25] text-slate-500">
+                  <div>Transaction Risk &amp;</div>
+                  <div>Cash-out Estimation</div>
+                </div>
+              </div>
             </div>
 
-            <div>
-              <div className="text-[15px] font-bold tracking-tight">
-                TRACE
+            {/* Main heading */}
+            <h1 className="text-3xl font-bold leading-[1.1] tracking-[-0.035em] text-slate-950 sm:text-6xl lg:text-[47px] mt-20">
+              AI That Predicts
+              
+              Where Fraud
+              
+              <span className=" ml-3 text-blue-500">
+                Moves Next.
+              </span>
+            </h1>
+
+            {/* Description */}
+            <p className="mt-7 max-w-[500px] text-base leading-6 text-slate-600 sm:text-sm">
+              TRACE combines artificial intelligence, financial intelligence,
+              and geographic data to predict where suspicious funds
+              are likely to be cashed out.
+            </p>
+
+           
+
+            {/* CTA */}
+            <button
+              type="button"
+              onClick={handleEnterDashboard}
+              className="group mt-9 inline-flex items-center gap-3 rounded-xl bg-slate-950 px-6 py-3.5 text-sm font-semibold text-white shadow-xl shadow-blue-900/15 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl"
+            >
+              Enter Dashboard
+
+              <ArrowRight
+                size={17}
+                className="transition-transform duration-300 group-hover:translate-x-1"
+              />
+            </button>
+
+            {/* Predict / Alert / Enable */}
+            <div className="mt-12 flex flex-wrap gap-x-8 gap-y-6 sm:gap-x-10">
+
+              {/* Predict */}
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-50 ring-1 ring-blue-100">
+                  <Target
+                    size={20}
+                    strokeWidth={2}
+                    className="text-blue-600"
+                  />
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    Predict
+                  </p>
+                  <p className="text-xs leading-5 text-slate-500">
+                    future cash-out
+                    <br />
+                    locations
+                  </p>
+                </div>
               </div>
 
-              <div className="text-[9px] font-medium uppercase tracking-[0.16em] text-slate-400">
-                Cyber Intelligence
+              {/* Alert */}
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-50 ring-1 ring-blue-100">
+                  <Bell
+                    size={20}
+                    strokeWidth={2}
+                    className="text-blue-600"
+                  />
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    Alert
+                  </p>
+                  <p className="text-xs leading-5 text-slate-500">
+                    the right
+                    <br />
+                    stakeholders
+                  </p>
+                </div>
               </div>
+
+              {/* Enable */}
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-50 ring-1 ring-blue-100">
+                  <ShieldCheck
+                    size={20}
+                    strokeWidth={2}
+                    className="text-blue-600"
+                  />
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    Enable
+                  </p>
+                  <p className="text-xs leading-5 text-slate-500">
+                    faster, smarter
+                    <br />
+                    intervention
+                  </p>
+                </div>
+              </div>
+
             </div>
           </div>
-
-          <div className="hidden text-sm text-slate-400 sm:block">
-            Transaction Risk & Cash-out Estimation
-          </div>
         </div>
-      </header>
-
-      {/* Hero */}
-      <main className="relative z-10 mx-auto max-w-[1200px] px-6">
-        <section className="flex min-h-[calc(100vh-64px)] flex-col items-center justify-center py-20 text-center">
-          
-          {/* AI badge */}
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-medium text-cyan-700">
-            <BrainCircuit size={14} />
-            Predictive Cybercrime Intelligence
-          </div>
-
-          <h1 className="max-w-4xl text-5xl font-bold tracking-[-0.04em] text-slate-950 sm:text-6xl">
-            Predict where fraud money
-            <span className="block bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
-              will be cashed out.
-            </span>
-          </h1>
-
-          <p className="mt-6 max-w-2xl text-base leading-7 text-slate-500 sm:text-lg">
-            TRACE transforms cybercrime complaints and financial patterns
-            into actionable predictions of where and when suspicious funds
-            are likely to be withdrawn.
-          </p>
-
-          {/* CTA */}
-          <button
-            onClick={handleEnterDashboard}
-            className="group mt-9 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 transition hover:-translate-y-0.5 hover:bg-slate-800"
-          >
-            Enter Dashboard
-
-            <ArrowRight
-              size={16}
-              className="transition-transform group-hover:translate-x-1"
-            />
-          </button>
-
-          {/* Intelligence flow */}
-          <div className="mt-20 grid w-full max-w-4xl grid-cols-1 gap-4 md:grid-cols-3">
-            <FlowCard
-              icon={<Network size={18} />}
-              number="01"
-              title="Detect"
-              description="Analyse complaints and financial activity."
-            />
-
-            <FlowCard
-              icon={<MapPinned size={18} />}
-              number="02"
-              title="Predict"
-              description="Estimate likely cash-out locations and time."
-            />
-
-            <FlowCard
-              icon={<ShieldCheck size={18} />}
-              number="03"
-              title="Intervene"
-              description="Deliver intelligence to authorised stakeholders."
-            />
-          </div>
-        </section>
-      </main>
-    </div>
-  );
-}
-
-interface FlowCardProps {
-  icon: ReactNode;
-  number: string;
-  title: string;
-  description: string;
-}
-
-function FlowCard({
-  icon,
-  number,
-  title,
-  description,
-}: FlowCardProps) {
-  return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-5 text-left shadow-sm backdrop-blur">
-      <div className="flex items-center justify-between">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600">
-          {icon}
-        </div>
-
-        <span className="text-xs font-semibold text-slate-300">
-          {number}
-        </span>
-      </div>
-
-      <h3 className="mt-5 text-sm font-semibold text-slate-800">
-        {title}
-      </h3>
-
-      <p className="mt-1 text-xs leading-5 text-slate-400">
-        {description}
-      </p>
-    </div>
+      </section>
+    </main>
   );
 }
