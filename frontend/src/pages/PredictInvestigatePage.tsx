@@ -2,6 +2,13 @@ import type { UserRole } from "../components/navigation/Navbar";
 import PageContainer from "../components/layout/PageContainer";
 import CaseSelector from "../components/ui/CaseSelector";
 import { mockCases } from "../data/cases.mock";
+import MoneyFlowGraph from "../features/money-flow/MoneyFlowGraph";
+import {
+  AlertTriangle,
+  BadgeDollarSign,
+  FileText,
+  ShieldAlert,
+} from "lucide-react";
 
 interface PredictInvestigatePageProps {
   role: UserRole;
@@ -42,10 +49,7 @@ export default function PredictInvestigatePage({
               Predict & Investigate
             </h1>
 
-            <p className="mt-1 max-w-2xl text-sm text-slate-500">
-              Predict likely cash-out locations, understand the evidence,
-              and investigate the financial trail.
-            </p>
+          
           </div>
 
           <div className="hidden rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-500 shadow-sm md:block">
@@ -57,54 +61,71 @@ export default function PredictInvestigatePage({
       </section>
 
       {/* Active Case */}
-      <section className="mb-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="mb-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-            Active Investigation
-          </p>
+<section className="mb-7 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+  {/* Section header */}
+  <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white px-5 py-4">
+    <div className="flex items-start justify-between gap-4">
+      <div>
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-50 text-cyan-600">
+            <FileText size={16} />
+          </div>
 
-          <h2 className="mt-1 text-base font-semibold text-slate-900">
-            Select an ongoing case
-          </h2>
+          <div>
+            <h2 className="text-[15px] font-bold text-slate-900">
+              Select an ongoing case
+            </h2>
 
-          <p className="mt-1 text-xs text-slate-400">
-            All intelligence shown below is scoped to the selected
-            complaint.
-          </p>
+            
+          </div>
         </div>
+      </div>
 
-        <CaseSelector
-          cases={caseOptions}
-          selectedCaseId={selectedCaseId}
-          onCaseChange={onCaseChange}
-        />
+      <div className="hidden rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-1.5 text-[10px] font-semibold text-emerald-700 sm:block">
+        LIVE CASE
+      </div>
+    </div>
+  </div>
 
-        {/* Selected Case Summary */}
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <CaseSummary
-            label="Case ID"
-            value={selectedCase.complaint.id}
-          />
+  {/* Case selector */}
+  <div className="px-5 pt-5">
+    <CaseSelector
+      cases={caseOptions}
+      selectedCaseId={selectedCaseId}
+      onCaseChange={onCaseChange}
+    />
+  </div>
 
-          <CaseSummary
-            label="Fraud Type"
-            value={selectedCase.complaint.fraudType}
-          />
+  {/* Selected Case Summary */}
+  <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-4">
+    <CaseSummary
+      icon={<FileText size={16} />}
+      label="Case ID"
+      value={selectedCase.complaint.id}
+    />
 
-          <CaseSummary
-            label="Amount"
-            value={`₹${selectedCase.complaint.amount.toLocaleString(
-              "en-IN",
-            )}`}
-          />
+    <CaseSummary
+      icon={<ShieldAlert size={16} />}
+      label="Fraud Type"
+      value={selectedCase.complaint.fraudType}
+    />
 
-          <CaseSummary
-            label="Risk Score"
-            value={`${selectedCase.complaint.riskScore}/100`}
-            critical={selectedCase.complaint.riskScore >= 80}
-          />
-        </div>
-      </section>
+    <CaseSummary
+      icon={<BadgeDollarSign size={16} />}
+      label="Amount"
+      value={`₹${selectedCase.complaint.amount.toLocaleString(
+        "en-IN",
+      )}`}
+    />
+
+    <CaseSummary
+      icon={<AlertTriangle size={16} />}
+      label="Risk Score"
+      value={`${selectedCase.complaint.riskScore}/100`}
+      critical={selectedCase.complaint.riskScore >= 80}
+    />
+  </div>
+</section>
 
       {/* Prediction + GIS */}
       <section className="mb-7">
@@ -126,14 +147,11 @@ export default function PredictInvestigatePage({
 
       {/* Money Flow */}
       <section className="mb-7">
-        <SectionHeading
-          title="Financial Money Flow"
-          description="Reserved for the complaint-to-account-to-mule-to-ATM network visualization."
-        />
-
-        <div className="mt-3 min-h-[430px] rounded-2xl border border-dashed border-slate-300 bg-white/70 p-6">
-          <SlotLabel label="MONEY-FLOW GRAPH FEATURE" />
-        </div>
+        <MoneyFlowGraph
+  accounts={selectedCase.accounts}
+  transactions={selectedCase.transactions}
+  predictedLocations={selectedCase.predictedLocations}
+/>
       </section>
 
       {/* Supporting Intelligence */}
@@ -164,27 +182,58 @@ export default function PredictInvestigatePage({
 interface CaseSummaryProps {
   label: string;
   value: string;
+  icon: React.ReactNode;
   critical?: boolean;
 }
 
 function CaseSummary({
   label,
   value,
+  icon,
   critical = false,
 }: CaseSummaryProps) {
   return (
-    <div className="rounded-xl bg-slate-50 px-4 py-3">
-      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
-        {label}
-      </p>
+    <div
+      className={`group relative overflow-hidden rounded-xl border px-4 py-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm ${
+        critical
+          ? "border-red-100 bg-red-50/40 hover:border-red-200"
+          : "border-slate-100 bg-slate-50/60 hover:border-slate-200 hover:bg-white"
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        {/* Icon */}
+        <div
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+            critical
+              ? "bg-red-100 text-red-600"
+              : "bg-white text-slate-500 shadow-sm"
+          }`}
+        >
+          {icon}
+        </div>
 
-      <p
-        className={`mt-1 text-sm font-semibold ${
-          critical ? "text-red-600" : "text-slate-800"
-        }`}
-      >
-        {value}
-      </p>
+        {/* Text */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="truncate text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+              {label}
+            </p>
+
+            {critical && (
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
+            )}
+          </div>
+
+          <p
+            className={`mt-1 truncate text-[14px] font-bold ${
+              critical ? "text-red-600" : "text-slate-800"
+            }`}
+            title={value}
+          >
+            {value}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
