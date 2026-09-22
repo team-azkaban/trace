@@ -16,8 +16,6 @@ import {
 import type { UserRole } from "../../components/navigation/Navbar";
 import {
   mockCases,
-  type CaseData,
-  type Complaint,
   type RiskLevel,
 } from "../../data/cases.mock";
 
@@ -74,7 +72,7 @@ function riskBadge(level: RiskLevel) {
 }
 
 function parseHour(timestamp: string) {
-  const match = timestamp.match(/\\s(\\d{2}):/);
+  const match = timestamp.match(/\s(\d{2}):/);
   return match ? Number(match[1]) : 0;
 }
 
@@ -288,7 +286,7 @@ export default function OverviewDashboard({ role }: OverviewDashboardProps) {
       if (bucket) bucket.reports += 1;
 
       item.predictedLocations.forEach((location) => {
-        const match = location.predictedWindow.match(/(\\d{2}):/);
+        const match = location.predictedWindow.match(/(\d{2}):/);
         const hour = match ? Number(match[1]) : -1;
         const predictionBucket = buckets.find(
           (entry) => hour >= entry.start && hour < entry.end,
