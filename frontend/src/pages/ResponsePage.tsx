@@ -3,6 +3,10 @@ import PageContainer from "../components/layout/PageContainer";
 import CaseSelector from "../components/ui/CaseSelector";
 import { mockCases } from "../data/cases.mock";
 
+import { CoverageSimulator } from "../features/coverage-simulator/CoverageSimulator";
+import { OutcomeTracker } from "../features/outcome-learning/OutcomeTracker";
+import { AccuracyTrend } from "../features/outcome-learning/AccuracyTrend";
+
 interface ResponsePageProps {
   role: UserRole;
   selectedCaseId: string;
@@ -28,8 +32,6 @@ export default function ResponsePage({
     receivedTime: caseItem.complaint.reportedAt,
   }));
 
-  // CaseData.alerts is an array, so use the first alert
-  // for the active alert section.
   const activeAlert = selectedCase.alerts[0];
 
   return (
@@ -150,40 +152,32 @@ export default function ResponsePage({
 
       {/* Coverage Simulator */}
       <section className="mb-7">
-        <SectionHeading
-          title="Intervention Coverage Simulator"
-          description="Reserved for testing hypothetical monitoring scenarios across predicted high-risk locations."
-        />
-
-        <div className="mt-3 min-h-[380px] rounded-2xl border border-dashed border-slate-300 bg-white/70 p-6">
-          <SlotLabel label="COVERAGE SIMULATOR FEATURE" />
+        <div className="mt-3">
+          <CoverageSimulator
+            predictedLocations={selectedCase.predictedLocations}
+          />
         </div>
       </section>
 
       {/* Outcome & Learning */}
       <section>
-        <SectionHeading
-          title="Prediction Outcome & Learning"
-          description="Reserved for recording prediction outcomes and tracking model performance over time."
-        />
 
-        <div className="mt-3 grid grid-cols-1 gap-5 lg:grid-cols-[0.8fr_1.2fr]">
-          <div className="min-h-[300px] rounded-2xl border border-dashed border-slate-300 bg-white/70 p-6">
-            <SlotLabel label="OUTCOME TRACKER" />
-          </div>
+        {/* Tracker and graph are intentionally stacked */}
+        <div className="mt-3 space-y-5">
+          <OutcomeTracker
+            outcome={selectedCase.outcome}
+            caseId={selectedCase.complaint.id}
+            predictedLocations={selectedCase.predictedLocations}
+          />
 
-          <div className="min-h-[300px] rounded-2xl border border-dashed border-slate-300 bg-white/70 p-6">
-            <SlotLabel label="LEARNING / ACCURACY TREND" />
-          </div>
+          <AccuracyTrend />
         </div>
       </section>
     </PageContainer>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/* Supporting UI                                                              */
-/* -------------------------------------------------------------------------- */
+/* Supporting UI */
 
 interface SectionHeadingProps {
   title: string;
