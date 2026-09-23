@@ -3,6 +3,8 @@ import PageContainer from "../components/layout/PageContainer";
 import CaseSelector from "../components/ui/CaseSelector";
 import { mockCases } from "../data/cases.mock";
 import MoneyFlowGraph from "../features/money-flow/MoneyFlowGraph";
+import ExplainabilityPanel from "../features/explainability/explainabilitypanel";
+import CCTVPanel from "../features/cctv/cctvpanel";
 import {
   AlertTriangle,
   BadgeDollarSign,
@@ -162,13 +164,11 @@ export default function PredictInvestigatePage({
         />
 
         <div className="mt-3 grid grid-cols-1 gap-5 lg:grid-cols-2">
-          <div className="min-h-[340px] rounded-2xl border border-dashed border-slate-300 bg-white/70 p-6">
-            <SlotLabel label="EXPLAINABILITY FEATURE" />
-          </div>
 
-          <div className="min-h-[340px] rounded-2xl border border-dashed border-slate-300 bg-white/70 p-6">
-            <SlotLabel label="CCTV / PHYSICAL INTELLIGENCE FEATURE" />
-          </div>
+          <ExplainabilityPanel />
+
+          <CCTVPanel />
+
         </div>
       </section>
     </PageContainer>
