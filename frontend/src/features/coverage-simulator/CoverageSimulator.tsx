@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
+  AlertTriangle,
   Check,
+  ChevronDown,
+  ChevronUp,
+  Clock3,
   MapPin,
   Play,
   RotateCcw,
@@ -22,6 +26,9 @@ import {
 type CoverageSimulatorProps = {
   predictedLocations: PredictedLocation[];
 };
+
+type TeamType = "Patrol" | "Branch" | "Cyber";
+type ResourceKey = "patrol" | "branch" | "cyber";
 
 type SimulatorLocation = {
   id: string;
@@ -89,6 +96,42 @@ const riskBadgeClasses: Record<PredictedLocation["riskLevel"], string> = {
   Low: "bg-green-50 text-green-700 border-green-200",
 };
 
+const teamMeta: Record<ResourceKey, { label: TeamType; color: string; glow: string }> = {
+  patrol: {
+    label: "Patrol",
+    color: "bg-cyan-500",
+    glow: "shadow-cyan-500/40",
+  },
+  branch: {
+    label: "Branch",
+    color: "bg-violet-500",
+    glow: "shadow-violet-500/40",
+  },
+  cyber: {
+    label: "Cyber",
+    color: "bg-emerald-500",
+    glow: "shadow-emerald-500/40",
+  },
+};
+
+const defaultResourceLevels: Record<ResourceKey, number> = {
+  patrol: 68,
+  branch: 52,
+  cyber: 81,
+};
+
+const teamResponseTimes: Record<ResourceKey, number> = {
+  patrol: 18,
+  branch: 11,
+  cyber: 7,
+};
+
+const teamShortageThresholds: Record<ResourceKey, number> = {
+  patrol: 45,
+  branch: 50,
+  cyber: 55,
+};
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
@@ -141,6 +184,8 @@ export function CoverageSimulator({
     useState<CoverageScenarioSize>(3);
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [resourceLevels, setResourceLevels] = useState(defaultResourceLevels);
+  const [teamDetailsExpanded, setTeamDetailsExpanded] = useState(true);
 
   const [displayedCoverage, setDisplayedCoverage] = useState(0);
   const [mapZoom, setMapZoom] = useState(1);
@@ -191,9 +236,12 @@ export function CoverageSimulator({
     }
 
     const selectionQuality = selectedScore / defaultScore;
+    const resourceAverage =
+      (resourceLevels.patrol + resourceLevels.branch + resourceLevels.cyber) / 3;
+    const resourceBoost = (resourceAverage - 50) * 0.26;
 
     const adjustedCoverage =
-      activeScenario.baselineCoverage * selectionQuality;
+      activeScenario.baselineCoverage * selectionQuality + resourceBoost;
 
     return Math.round(clamp(adjustedCoverage, 20, 99));
   }, [
@@ -201,7 +249,82 @@ export function CoverageSimulator({
     allLocations,
     scenarioSize,
     selectedLocations,
+    resourceLevels,
   ]);
+
+  const scenarioComparison = useMemo(
+    () =>
+      coverageScenarios.map((scenario) => {
+        const averageResource =
+          (resourceLevels.patrol + resourceLevels.branch + resourceLevels.cyber) / 3;
+        const projectedCoverage = Math.round(
+          clamp(
+            scenario.baselineCoverage +
+              (averageResource - 50) * 0.45 -
+              (scenario.size === 3 ? 6 : scenario.size === 5 ? 2 : 0),
+            25,
+            99,
+          ),
+        );
+
+        return {
+          ...scenario,
+          projectedCoverage,
+        };
+      }),
+    [resourceLevels],
+  );
+
+  const teamWarnings = useMemo(
+    () =>
+      (Object.keys(teamMeta) as ResourceKey[]).filter(
+        (key) => resourceLevels[key] < teamShortageThresholds[key],
+      ),
+    [resourceLevels],
+  );
+
+  const recommendedPlan = useMemo(() => {
+    const depth = selectedLocations.length > 0 ? selectedLocations.length : scenarioSize;
+    const strongestTeam =
+      Object.entries(teamMeta).reduce(
+        (best, [key, meta]) => {
+          const current = resourceLevels[key as ResourceKey];
+          if (!best || current > best.value) {
+            return { key: key as ResourceKey, value: current, label: meta.label };
+          }
+          return best;
+        },
+        null as { key: ResourceKey; value: number; label: string } | null,
+      );
+
+    const totalRisk = selectedLocations.reduce(
+      (total, location) => total + getLocationScore(location),
+      0,
+    );
+
+    const estimatedResponse =
+      Math.max(
+        8,
+        Math.round(
+          22 -
+            (resourceLevels.patrol + resourceLevels.branch + resourceLevels.cyber) / 10 +
+            depth * 0.9,
+        ),
+      );
+
+    return {
+      team: strongestTeam?.label ?? "Patrol",
+      riskCoverage: Math.max(62, Math.min(96, Math.round(displayedCoverage || simulatedCoverage))),
+      responseMinutes: estimatedResponse,
+      hotspots: depth,
+      summary:
+        strongestTeam && strongestTeam.value < 50
+          ? `${strongestTeam.label} teams are under-resourced; prioritize branch dispatch before the next high-risk window.`
+          : `Deploy ${Math.min(scenarioSize, depth)} priority teams across the selected hotspots with ${strongestTeam?.label ?? "Patrol"} support to maximize coverage before ${selectedLocations[0]?.predictedWindow ?? "the next cash-out window"}.`,
+      criticalHotspots: selectedLocations.filter((location) => location.riskLevel === "Critical").length,
+      totalRisk,
+    };
+  }, [selectedLocations, scenarioSize, resourceLevels, displayedCoverage, simulatedCoverage]);
 
   useEffect(() => {
     let animationFrame = 0;
@@ -309,14 +432,19 @@ export function CoverageSimulator({
             </div>
 
             <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
-              Test different monitoring combinations and see how the
-              simulated operational coverage changes.
+              This is a deployment simulation: pick the hotspots and team capacity,
+              then estimate how much predicted cash-out risk can be covered in real time.
             </p>
           </div>
         </div>
       </div>
 
       <div className="p-5">
+        <div className="mb-4 rounded-xl border border-cyan-100 bg-cyan-50/70 px-3 py-2 text-[11px] text-slate-700">
+          <span className="font-semibold text-cyan-700">What this simulates:</span>{" "}
+          select risky ATM/branch points, assign monitoring capacity, and preview how much risk coverage you gain before sending teams.
+        </div>
+
         {/* Scenario selector */}
         <div>
           <div className="mb-2 flex items-center justify-between">
@@ -358,6 +486,192 @@ export function CoverageSimulator({
           </div>
         </div>
 
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+          <button
+            type="button"
+            onClick={() => setTeamDetailsExpanded((current) => !current)}
+            className="flex w-full items-center justify-between gap-3 text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-slate-700 shadow-sm">
+                <Users size={15} />
+              </div>
+
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Team deployment mix
+                </p>
+                <p className="mt-0.5 text-sm font-semibold text-slate-800">
+                  Response planning
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {teamWarnings.length > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[9px] font-semibold text-amber-700">
+                  <AlertTriangle size={10} />
+                  shortage
+                </span>
+              )}
+
+              {teamDetailsExpanded ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
+            </div>
+          </button>
+
+          {teamDetailsExpanded && (
+            <>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {(Object.keys(teamMeta) as ResourceKey[]).map((key) => (
+                  <span
+                    key={key}
+                    className={`inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-700 shadow-sm ${teamMeta[key].glow}`}
+                  >
+                    <span className={`h-2.5 w-2.5 rounded-full ${teamMeta[key].color}`} />
+                    {teamMeta[key].label}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                {(Object.keys(teamMeta) as ResourceKey[]).map((key) => {
+                  const shortage = resourceLevels[key] < teamShortageThresholds[key];
+                  const responseMinutes = teamResponseTimes[key];
+
+                  return (
+                    <div
+                      key={key}
+                      className={`rounded-xl border p-3 shadow-sm ${shortage ? "border-amber-200 bg-amber-50/40" : "border-slate-200 bg-white"}`}
+                    >
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          {teamMeta[key].label}
+                        </span>
+                        <span className="text-[11px] font-bold text-slate-800">
+                          {resourceLevels[key]}%
+                        </span>
+                      </div>
+
+                      <div className="mb-2 flex items-center gap-1.5 text-[10px] text-slate-500">
+                        <Clock3 size={11} />
+                        {responseMinutes} min avg response
+                      </div>
+
+                      <input
+                        type="range"
+                        min={20}
+                        max={100}
+                        value={resourceLevels[key]}
+                        onChange={(event) =>
+                          setResourceLevels((current) => ({
+                            ...current,
+                            [key]: Number(event.target.value),
+                          }))
+                        }
+                        className="h-2 w-full cursor-pointer accent-cyan-500"
+                      />
+
+                      {shortage && (
+                        <div className="mt-2 flex items-center gap-1 text-[9px] font-semibold text-amber-700">
+                          <AlertTriangle size={10} />
+                          Resource shortage risk
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+          {scenarioComparison.map((scenario) => {
+            const isActive = scenario.size === scenarioSize;
+            return (
+              <div
+                key={scenario.size}
+                className={`rounded-2xl border p-3 transition-all ${
+                  isActive
+                    ? "border-cyan-200 bg-cyan-50/80 shadow-sm"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    {scenario.size} teams
+                  </span>
+
+                  {isActive && (
+                    <span className="rounded-full border border-cyan-200 bg-white px-1.5 py-0.5 text-[9px] font-semibold text-cyan-700">
+                      Active
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
+                  {scenario.projectedCoverage}%
+                </div>
+
+                <div className="mt-1 text-[10px] text-slate-500">
+                  projected coverage
+                </div>
+
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-cyan-500 via-sky-500 to-emerald-400"
+                    style={{ width: `${scenario.projectedCoverage}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                Recommended deployment plan
+              </p>
+              <h4 className="mt-2 text-base font-bold text-slate-900">
+                {recommendedPlan.team} lead deployment
+              </h4>
+            </div>
+
+            <div className="rounded-full border border-emerald-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
+              {recommendedPlan.riskCoverage}% coverage
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="rounded-xl border border-emerald-200 bg-white/80 p-3">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Active hotspots
+              </div>
+              <div className="mt-1 text-xl font-bold text-slate-900">{recommendedPlan.hotspots}</div>
+            </div>
+
+            <div className="rounded-xl border border-emerald-200 bg-white/80 p-3">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Response window
+              </div>
+              <div className="mt-1 text-xl font-bold text-slate-900">{recommendedPlan.responseMinutes} min</div>
+            </div>
+
+            <div className="rounded-xl border border-emerald-200 bg-white/80 p-3">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Critical points
+              </div>
+              <div className="mt-1 text-xl font-bold text-slate-900">{recommendedPlan.criticalHotspots}</div>
+            </div>
+          </div>
+
+          <p className="mt-3 text-xs leading-5 text-slate-600">
+            {recommendedPlan.summary}
+          </p>
+        </div>
+
         {/* Deployment canvas and location list */}
         <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[1.25fr_0.75fr]">
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 p-4 shadow-inner">
@@ -390,23 +704,64 @@ export function CoverageSimulator({
                   <pattern id="trace-grid" width="10" height="10" patternUnits="userSpaceOnUse">
                     <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#8dd6e0" strokeOpacity="0.09" strokeWidth="0.35" />
                   </pattern>
+                  <radialGradient id="coverage-glow" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stopColor="#67e8f9" stopOpacity="0.36" />
+                    <stop offset="60%" stopColor="#22d3ee" stopOpacity="0.12" />
+                    <stop offset="100%" stopColor="#22d3ee" stopOpacity="0" />
+                  </radialGradient>
                 </defs>
                 <rect width="100" height="100" fill="url(#trace-grid)" />
-                <path d="M5 78 C24 58, 20 30, 42 22 S75 30, 96 8" fill="none" stroke="#38bdf8" strokeOpacity="0.3" strokeWidth="1.2" strokeDasharray="2 3" className={isSimulating ? "animate-pulse" : ""} />
-                <path d="M2 28 C28 42, 52 35, 80 76" fill="none" stroke="#67e8f9" strokeOpacity="0.12" strokeWidth="0.9" />
+                <path d="M5 78 C24 58, 20 30, 42 22 S75 30, 96 8" fill="none" stroke="#38bdf8" strokeOpacity="0.35" strokeWidth="1.1" strokeDasharray="2 3" className={isSimulating ? "animate-pulse" : ""} />
+                <path d="M2 28 C28 42, 52 35, 80 76" fill="none" stroke="#67e8f9" strokeOpacity="0.18" strokeWidth="0.9" />
+                <path d="M18 62 C35 48, 50 52, 78 48" fill="none" stroke="#a5f3fc" strokeOpacity="0.14" strokeWidth="1" />
+
+                {selectedLocations.length > 1 && (
+                  <polyline
+                    points={selectedLocations
+                      .map((location) => {
+                        const targetIndex = allLocations.findIndex((item) => item.id === location.id);
+                        const point = getCanvasPosition(targetIndex, allLocations.length);
+                        return `${point.x},${point.y}`;
+                      })
+                      .join(" ")}
+                    fill="none"
+                    stroke="#67e8f9"
+                    strokeOpacity="0.7"
+                    strokeWidth="0.7"
+                    strokeDasharray="2 2"
+                  />
+                )}
+
                 {allLocations.map((location, index) => {
                   const position = getCanvasPosition(index, allLocations.length);
                   const selected = selectedIds.includes(location.id);
                   const selectedIndex = selectedLocations.findIndex((item) => item.id === location.id);
                   const revealed = !isSimulating || selectedIndex <= simulationStep;
                   const isCritical = location.riskLevel === "Critical";
+                  const ringRadius = selected && revealed
+                    ? isCritical ? 12 : location.riskLevel === "High" ? 10 : 8
+                    : 0;
+
                   return (
                     <g key={location.id} role="button" tabIndex={0} aria-label={`${selected ? "Remove" : "Add"} ${location.name} hotspot`} onClick={() => toggleLocation(location.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") toggleLocation(location.id); }} className="cursor-pointer">
                       {selected && revealed && (
-                        <circle cx={position.x} cy={position.y} r="10" fill="#22d3ee" fillOpacity="0.12" stroke="#67e8f9" strokeOpacity="0.55" strokeWidth="0.7" />
+                        <>
+                          <circle cx={position.x} cy={position.y} r={ringRadius + 6} fill="url(#coverage-glow)" />
+                          <circle cx={position.x} cy={position.y} r={ringRadius} fill="none" stroke="#67e8f9" strokeOpacity="0.7" strokeWidth="0.75" strokeDasharray="1.2 1.4" />
+                        </>
                       )}
-                      <circle cx={position.x} cy={position.y} r={isCritical ? "2.8" : "2.2"} fill={selected && revealed ? "#67e8f9" : isCritical ? "#fb7185" : location.riskLevel === "High" ? "#fb923c" : "#fbbf24"} stroke="#fff" strokeOpacity="0.75" strokeWidth="0.7" />
-                      {selected && revealed && <circle cx={position.x} cy={position.y} r="1" fill="#ecfeff" />}
+
+                      <circle cx={position.x} cy={position.y} r={isCritical ? "2.8" : "2.2"} fill={selected && revealed ? "#67e8f9" : isCritical ? "#fb7185" : location.riskLevel === "High" ? "#fb923c" : "#fbbf24"} stroke="#fff" strokeOpacity="0.8" strokeWidth="0.7" />
+
+                      {selected && revealed && (
+                        <>
+                          <circle cx={position.x} cy={position.y} r="1" fill="#ecfeff" />
+                          <rect x={position.x + 2.5} y={position.y - 7} width="11" height="5" rx="2.2" fill="#0f172a" fillOpacity="0.8" stroke="#67e8f9" strokeOpacity="0.7" />
+                          <text x={position.x + 7} y={position.y - 3.4} textAnchor="middle" fill="#ecfeff" fontSize="2.3" fontWeight="700">
+                            {selectedLocations.findIndex((item) => item.id === location.id) + 1}
+                          </text>
+                        </>
+                      )}
                     </g>
                   );
                 })}
@@ -435,7 +790,7 @@ export function CoverageSimulator({
                 className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-cyan-400 px-3 py-2 text-[11px] font-bold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Play size={13} fill="currentColor" />
-                {isSimulating ? "Simulating..." : "Run simulation"}
+                {isSimulating ? "Simulating..." : "Run coverage simulation"}
               </button>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2">
