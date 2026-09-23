@@ -53,7 +53,7 @@ type EntityType =
   | "pattern"
   | "related-case";
 
-interface InvestigationNodeData {
+interface InvestigationNodeData extends Record<string, unknown> {
   label: string;
   subtitle: string;
   entityType: EntityType;
@@ -1598,29 +1598,3 @@ function PanelHint({
   );
 }
 
-function getEntityDescription(
-  type: EntityType,
-) {
-  switch (type) {
-    case "victim":
-      return "Victim account";
-
-    case "mule":
-      return "Suspected mule account";
-
-    case "beneficiary":
-      return "Beneficiary account";
-
-    case "cashout":
-      return "Predicted withdrawal location";
-
-    case "pattern":
-      return "City-level fraud pattern";
-
-    case "related-case":
-      return "Related historical case";
-
-    default:
-      return "Investigation entity";
-  }
-}

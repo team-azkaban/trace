@@ -1,7 +1,4 @@
-import type {
-  OutcomeStatus,
-  RiskLevel,
-} from "../../data/cases.mock";
+import type { OutcomeStatus } from "../../data/cases.mock";
 
 export type AccuracyPoint = {
   date: string;

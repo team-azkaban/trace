@@ -5,6 +5,7 @@ import { mockCases } from "../data/cases.mock";
 import MoneyFlowGraph from "../features/money-flow/MoneyFlowGraph";
 import ExplainabilityPanel from "../features/explainability/explainabilitypanel";
 import CCTVPanel from "../features/cctv/cctvpanel";
+import VaniaPredictiveLocation from "../features/predictive_location/VaniaPredictiveLocation";
 import {
   AlertTriangle,
   BadgeDollarSign,
@@ -136,13 +137,9 @@ export default function PredictInvestigatePage({
           description="Reserved for predicted withdrawal locations, confidence and time-window intelligence."
         />
 
-        <div className="mt-3 grid grid-cols-1 gap-5 lg:grid-cols-[0.9fr_1.6fr]">
-          <div className="min-h-[480px] rounded-2xl border border-dashed border-slate-300 bg-white/70 p-6">
-            <SlotLabel label="PREDICTION FEATURE" />
-          </div>
-
-          <div className="min-h-[480px] rounded-2xl border border-dashed border-slate-300 bg-white/70 p-6">
-            <SlotLabel label="GIS / RISK HEATMAP FEATURE" />
+        <div className="mt-3 grid grid-cols-1">
+          <div className="min-h-[480px] rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <VaniaPredictiveLocation />
           </div>
         </div>
       </section>
@@ -260,12 +257,3 @@ function SectionHeading({
   );
 }
 
-function SlotLabel({ label }: { label: string }) {
-  return (
-    <div className="flex h-full min-h-[100px] items-center justify-center">
-      <span className="rounded-full bg-slate-100 px-4 py-2 text-[10px] font-semibold tracking-[0.12em] text-slate-400">
-        {label}
-      </span>
-    </div>
-  );
-}
