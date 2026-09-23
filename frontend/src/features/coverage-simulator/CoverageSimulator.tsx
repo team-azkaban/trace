@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Info, MapPin, ShieldCheck } from "lucide-react";
+import type { ReactNode } from "react";
+import {
+  Check,
+  MapPin,
+  Play,
+  RotateCcw,
+  ShieldCheck,
+  Target,
+  Users,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
 import type { PredictedLocation } from "../../data/cases.mock";
 import {
   additionalCoverageHotspots,
@@ -89,6 +100,16 @@ function getLocationScore(location: SimulatorLocation) {
   });
 }
 
+function getCanvasPosition(index: number, total: number) {
+  const columns = total > 6 ? 4 : 3;
+  const column = index % columns;
+  const row = Math.floor(index / columns);
+  return {
+    x: 16 + (column * 68) / Math.max(columns - 1, 1),
+    y: 18 + (row * 64) / Math.max(Math.ceil(total / columns) - 1, 1),
+  };
+}
+
 export function CoverageSimulator({
   predictedLocations,
 }: CoverageSimulatorProps) {
@@ -122,12 +143,17 @@ export function CoverageSimulator({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const [displayedCoverage, setDisplayedCoverage] = useState(0);
+  const [mapZoom, setMapZoom] = useState(1);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulationStep, setSimulationStep] = useState(-1);
 
   useEffect(() => {
     const initialSelection = allLocations
       .slice(0, scenarioSize)
       .map((location) => location.id);
 
+    // The scenario change intentionally resets the selectable deployment points.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedIds(initialSelection);
   }, [allLocations, scenarioSize]);
 
@@ -214,6 +240,26 @@ export function CoverageSimulator({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [simulatedCoverage]);
 
+  useEffect(() => {
+    if (!isSimulating) return;
+
+    // Start the visual deployment sequence when the user runs a scenario.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSimulationStep(0);
+    const timer = window.setInterval(() => {
+      setSimulationStep((current) => {
+        if (current >= selectedLocations.length - 1) {
+          window.clearInterval(timer);
+          setIsSimulating(false);
+          return current;
+        }
+        return current + 1;
+      });
+    }, 500);
+
+    return () => window.clearInterval(timer);
+  }, [isSimulating, selectedLocations.length]);
+
   const toggleLocation = (id: string) => {
     setSelectedIds((current) => {
       if (current.includes(id)) {
@@ -230,12 +276,12 @@ export function CoverageSimulator({
 
   const selectScenario = (size: CoverageScenarioSize) => {
     setScenarioSize(size);
+    setSimulationStep(-1);
   };
 
-  const circumference = 2 * Math.PI * 54;
-
-  const dashOffset =
-    circumference - (displayedCoverage / 100) * circumference;
+  const runSimulation = () => {
+    if (selectedLocations.length > 0) setIsSimulating(true);
+  };
 
   const coverageDifference =
     activeScenario &&
@@ -247,8 +293,6 @@ export function CoverageSimulator({
     coverageDifference > 0
       ? `+${coverageDifference} pts`
       : `${coverageDifference} pts`;
-
-  const activeColors = scenarioColors[scenarioSize];
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -314,67 +358,93 @@ export function CoverageSimulator({
           </div>
         </div>
 
-        {/* Main content */}
-        <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-          {/* Coverage ring */}
-          <div
-            className={`flex flex-col items-center justify-center rounded-2xl border p-6 transition-colors duration-300 ${activeColors.soft}`}
-          >
-            <div className="relative h-48 w-48">
-              <svg
-                className="h-full w-full -rotate-90"
-                viewBox="0 0 120 120"
-              >
-                <circle
-                  cx="60"
-                  cy="60"
-                  r="54"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="9"
-                  className={activeColors.ringTrack}
-                />
-
-                <circle
-                  cx="60"
-                  cy="60"
-                  r="54"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="9"
-                  strokeLinecap="round"
-                  className={`${activeColors.ring} transition-all duration-300`}
-                  strokeDasharray={circumference}
-                  strokeDashoffset={dashOffset}
-                />
-              </svg>
-
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-4xl font-bold tracking-tight text-slate-900">
-                  {displayedCoverage}%
-                </span>
-
-                <span className="mt-1 text-xs font-medium text-slate-500">
-                  operational coverage
-                </span>
+        {/* Deployment canvas and location list */}
+        <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[1.25fr_0.75fr]">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 p-4 shadow-inner">
+            <div className="mb-3 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-300">
+                  Deployment view
+                </p>
+                <p className="mt-1 text-xs text-slate-300">
+                  Teal rings show the risk covered by your selected teams.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setMapZoom((current) => clamp(current - 0.15, 0.85, 1.5))} aria-label="Zoom out deployment view" className="rounded-lg border border-slate-700 bg-slate-900 p-1.5 text-slate-300 transition hover:border-cyan-300 hover:text-cyan-200">
+                  <ZoomOut size={14} />
+                </button>
+                <span className="min-w-12 text-center text-[10px] font-semibold text-slate-400">{Math.round(mapZoom * 100)}%</span>
+                <button type="button" onClick={() => setMapZoom((current) => clamp(current + 0.15, 0.85, 1.5))} aria-label="Zoom in deployment view" className="rounded-lg border border-slate-700 bg-slate-900 p-1.5 text-slate-300 transition hover:border-cyan-300 hover:text-cyan-200">
+                  <ZoomIn size={14} />
+                </button>
+                <button type="button" onClick={() => setMapZoom(1)} aria-label="Reset deployment view" className="rounded-lg border border-slate-700 bg-slate-900 p-1.5 text-slate-300 transition hover:border-cyan-300 hover:text-cyan-200">
+                  <RotateCcw size={14} />
+                </button>
               </div>
             </div>
-
-            <div className="mt-3 text-center">
-              <p className="text-xs font-semibold text-slate-700">
-                {selectedLocations.length} of {scenarioSize} monitoring
-                points selected
+            <div className="relative aspect-[1.55] overflow-hidden rounded-xl border border-slate-800 bg-[radial-gradient(circle_at_50%_45%,#1e3a4b_0%,#0f202b_48%,#08141d_100%)]">
+              <div className="absolute inset-0 transition-transform duration-300" style={{ transform: `scale(${mapZoom})` }}>
+              <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full" aria-label="Simulated intervention coverage map">
+                <defs>
+                  <pattern id="trace-grid" width="10" height="10" patternUnits="userSpaceOnUse">
+                    <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#8dd6e0" strokeOpacity="0.09" strokeWidth="0.35" />
+                  </pattern>
+                </defs>
+                <rect width="100" height="100" fill="url(#trace-grid)" />
+                <path d="M5 78 C24 58, 20 30, 42 22 S75 30, 96 8" fill="none" stroke="#38bdf8" strokeOpacity="0.3" strokeWidth="1.2" strokeDasharray="2 3" className={isSimulating ? "animate-pulse" : ""} />
+                <path d="M2 28 C28 42, 52 35, 80 76" fill="none" stroke="#67e8f9" strokeOpacity="0.12" strokeWidth="0.9" />
+                {allLocations.map((location, index) => {
+                  const position = getCanvasPosition(index, allLocations.length);
+                  const selected = selectedIds.includes(location.id);
+                  const selectedIndex = selectedLocations.findIndex((item) => item.id === location.id);
+                  const revealed = !isSimulating || selectedIndex <= simulationStep;
+                  const isCritical = location.riskLevel === "Critical";
+                  return (
+                    <g key={location.id} role="button" tabIndex={0} aria-label={`${selected ? "Remove" : "Add"} ${location.name} hotspot`} onClick={() => toggleLocation(location.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") toggleLocation(location.id); }} className="cursor-pointer">
+                      {selected && revealed && (
+                        <circle cx={position.x} cy={position.y} r="10" fill="#22d3ee" fillOpacity="0.12" stroke="#67e8f9" strokeOpacity="0.55" strokeWidth="0.7" />
+                      )}
+                      <circle cx={position.x} cy={position.y} r={isCritical ? "2.8" : "2.2"} fill={selected && revealed ? "#67e8f9" : isCritical ? "#fb7185" : location.riskLevel === "High" ? "#fb923c" : "#fbbf24"} stroke="#fff" strokeOpacity="0.75" strokeWidth="0.7" />
+                      {selected && revealed && <circle cx={position.x} cy={position.y} r="1" fill="#ecfeff" />}
+                    </g>
+                  );
+                })}
+              </svg>
+              </div>
+              <div className={`absolute inset-y-0 left-0 w-1 bg-cyan-300/70 shadow-[0_0_24px_rgba(103,232,249,0.8)] transition-transform duration-1000 ${isSimulating ? "translate-x-[calc(100%+500px)]" : "-translate-x-full"}`} />
+              <div className="absolute bottom-3 left-3 flex flex-wrap gap-2 text-[10px] text-slate-300">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/80 px-2 py-1"><span className="h-2 w-2 rounded-full bg-rose-400" />Critical hotspot</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/80 px-2 py-1"><span className="h-2 w-2 rounded-full border border-cyan-200 bg-cyan-400/30" />Selected coverage</span>
+              </div>
+              <div className="absolute right-3 top-3 rounded-xl border border-cyan-300/20 bg-slate-950/70 px-3 py-2 text-right backdrop-blur">
+                <p className="text-2xl font-bold tracking-tight text-white">{displayedCoverage}%</p>
+                <p className="text-[9px] uppercase tracking-wider text-cyan-200">risk covered</p>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <p className="text-[10px] text-slate-400">
+                {isSimulating
+                  ? `Deploying team ${Math.max(simulationStep + 1, 1)} of ${selectedLocations.length}...`
+                  : "Click a hotspot or monitoring point to edit the scenario."}
               </p>
-
-              <p className="mt-1 text-[11px] text-slate-400">
-                {coverageDifference === 0
-                  ? "Baseline configuration"
-                  : `${differenceText} vs baseline`}
-              </p>
+              <button
+                type="button"
+                onClick={runSimulation}
+                disabled={isSimulating || selectedLocations.length === 0}
+                className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-cyan-400 px-3 py-2 text-[11px] font-bold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Play size={13} fill="currentColor" />
+                {isSimulating ? "Simulating..." : "Run simulation"}
+              </button>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <ImpactStat icon={<Target size={13} />} label="Points active" value={`${selectedLocations.length}/${scenarioSize}`} />
+              <ImpactStat icon={<ShieldCheck size={13} />} label="Critical covered" value={`${selectedLocations.filter((location) => location.riskLevel === "Critical").length}`} />
+              <ImpactStat icon={<Users size={13} />} label="Scenario delta" value={coverageDifference === 0 ? "Baseline" : differenceText} />
             </div>
           </div>
 
-          {/* Location list */}
           <div>
             <div className="mb-3 flex items-center justify-between">
               <div>
@@ -472,6 +542,26 @@ export function CoverageSimulator({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ImpactStat({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900/80 px-3 py-2.5">
+      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+        {icon}
+        {label}
+      </div>
+      <p className="mt-1 text-sm font-bold text-white">{value}</p>
     </div>
   );
 }
