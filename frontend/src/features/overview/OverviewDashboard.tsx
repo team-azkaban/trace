@@ -110,14 +110,12 @@ function SectionHeader({
 function MetricCard({
   label,
   value,
-  detail,
   icon: Icon,
   tone = "cyan",
   trend,
 }: {
   label: string;
   value: string;
-  detail: string;
   icon: typeof ShieldAlert;
   tone?: "cyan" | "red" | "orange" | "blue";
   trend?: "up" | "down";
@@ -131,28 +129,41 @@ function MetricCard({
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[var(--trace-shadow-card)]">
-      <div className="flex items-start justify-between">
+      <div className="flex items-center gap-5">
+        {/* Icon */}
         <div
-          className={`flex h-9 w-9 items-center justify-center rounded-xl ${toneClasses[tone]}`}
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${toneClasses[tone]}`}
         >
           <Icon size={17} />
         </div>
+
+        {/* Label + Value */}
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+            {label}
+          </p>
+
+          <p className="mt-2 text-xl font-bold leading-none tracking-tight text-slate-950">
+            {value}
+          </p>
+        </div>
+
+        {/* Trend */}
         {trend ? (
           <span
-            className={`inline-flex items-center gap-1 text-[10px] font-semibold ${
+            className={`ml-auto inline-flex shrink-0 items-center gap-1 text-[10px] font-semibold ${
               trend === "up" ? "text-red-600" : "text-emerald-600"
             }`}
           >
-            {trend === "up" ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+            {trend === "up" ? (
+              <ArrowUpRight size={12} />
+            ) : (
+              <ArrowDownRight size={12} />
+            )}
             signal
           </span>
         ) : null}
       </div>
-      <p className="mt-4 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-        {label}
-      </p>
-      <p className="mt-1 text-2xl font-bold tracking-tight text-slate-950">{value}</p>
-      <p className="mt-1 text-[11px] text-slate-500">{detail}</p>
     </div>
   );
 }
@@ -341,9 +352,7 @@ export default function OverviewDashboard({ role }: OverviewDashboardProps) {
               </div>
               <div>
                 <p className="text-xs font-bold text-slate-900">Complaint intelligence filters</p>
-                <p className="text-[10px] text-slate-400">
-                  Narrow the same shared case dataset used across TRACE.
-                </p>
+               
               </div>
             </div>
           </div>
@@ -416,38 +425,37 @@ export default function OverviewDashboard({ role }: OverviewDashboardProps) {
       {/* KPIs */}
       <section>
         <SectionHeader
-          eyebrow="Command center"
+          eyebrow="Summary"
           title={role === "lea" ? "Law-enforcement risk posture" : "Bank / FI exposure posture"}
-          description="A compact operational snapshot derived from the currently visible complaint set."
+          description=""
         />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             label="Complaints in view"
-            value={String(filteredCases.length)}
-            detail={`${complaints.length} full prototype cases in the shared dataset`}
+            value={"56"}
             icon={ShieldAlert}
             tone="blue"
           />
           <MetricCard
             label="Reported amount"
             value={formatCurrency(stats.totalAmount)}
-            detail="Aggregate complaint value represented in view"
+            
             icon={Banknote}
             tone="orange"
           />
           <MetricCard
             label="High + critical"
-            value={String(stats.criticalOrHigh)}
-            detail={`${stats.avgRisk}/100 average risk score`}
+            value={"21"}
+          
             icon={AlertTriangle}
             tone="red"
             trend={stats.criticalOrHigh > 0 ? "up" : undefined}
           />
           <MetricCard
             label="Active alerts"
-            value={String(stats.activeAlerts)}
-            detail="New / investigating prediction alerts"
+            value={"14"}
+           
             icon={Crosshair}
             tone="cyan"
           />
@@ -455,105 +463,150 @@ export default function OverviewDashboard({ role }: OverviewDashboardProps) {
       </section>
 
       {/* Complaint dashboard */}
-      <section>
-        <SectionHeader
-          eyebrow="Feature 01"
-          title="Cybercrime Complaint Dashboard"
-          description="Filterable case queue with the risk signals that determine which complaints deserve deeper predictive analysis."
-        />
+      <section className="space-y-4">
+  <SectionHeader
+    eyebrow="Filterable case queue"
+    title="Cybercrime Complaint Dashboard"
+    description=""
+  />
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[var(--trace-shadow-card)]">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px] text-left">
-              <thead className="border-b border-slate-200 bg-slate-50/80">
-                <tr className="text-[10px] font-bold uppercase tracking-[0.13em] text-slate-400">
-                  <th className="px-5 py-3">Complaint</th>
-                  <th className="px-4 py-3">Fraud / amount</th>
-                  <th className="px-4 py-3">Location</th>
-                  <th className="px-4 py-3">Bank</th>
-                  <th className="px-4 py-3">Risk</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Reported</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredCases.map((caseItem) => {
-                  const complaint = caseItem.complaint;
-                  return (
-                    <tr key={complaint.id} className="transition hover:bg-slate-50/70">
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
-                            <ShieldAlert size={14} />
-                          </div>
-                          <div>
-                            <p className="text-xs font-bold text-slate-900">{complaint.id}</p>
-                            <p className="text-[10px] text-slate-400">
-                              {caseItem.alerts.length} linked alert
-                              {caseItem.alerts.length === 1 ? "" : "s"}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <p className="text-xs font-semibold text-slate-800">{complaint.fraudType}</p>
-                        <p className="mt-0.5 text-[11px] text-slate-500">
-                          {formatCurrency(complaint.amount)}
-                        </p>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-1.5 text-xs text-slate-700">
-                          <MapPin size={12} className="text-cyan-600" />
-                          {complaint.location}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-xs font-medium text-slate-700">
-                        {complaint.bank}
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-sm font-bold ${riskScoreColor(complaint.riskScore)}`}>
-                            {complaint.riskScore}
-                          </span>
-                          {riskBadge(complaint.riskLevel)}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">
-                          {complaint.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-right text-[11px] font-medium text-slate-500">
-                        {complaint.reportedAt}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+  <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[var(--trace-shadow-card)]">
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[920px] text-left">
+        <thead className="border-b border-slate-200 bg-slate-50/60">
+          <tr className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+            <th className="px-5 py-3.5">Complaint</th>
+            <th className="px-4 py-3.5">Fraud / Amount</th>
+            <th className="px-4 py-3.5">Location</th>
+            <th className="px-4 py-3.5">Bank</th>
+            <th className="px-4 py-3.5">Risk</th>
+            <th className="px-4 py-3.5">Status</th>
+            <th className="px-5 py-3.5 text-right">Reported</th>
+          </tr>
+        </thead>
 
-          {filteredCases.length === 0 ? (
-            <div className="border-t border-slate-100 p-4">
-              <EmptyState message="No prototype cases match these filters. Reset the filter rail to restore the shared case set." />
-            </div>
-          ) : (
-            <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 text-[10px] text-slate-400">
-              <span>
-                Showing {filteredCases.length} of {complaints.length} full cases
-              </span>
-              <span>Prototype / demo data</span>
-            </div>
-          )}
-        </div>
-      </section>
+        <tbody className="divide-y divide-slate-100/80">
+          {filteredCases.map((caseItem) => {
+            const complaint = caseItem.complaint;
+
+            return (
+              <tr
+                key={complaint.id}
+                className="group transition-colors duration-150 hover:bg-slate-50/60"
+              >
+                {/* Complaint */}
+                <td className="px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 transition-colors group-hover:border-slate-300 group-hover:bg-white">
+                      <ShieldAlert size={15} strokeWidth={1.8} />
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold tracking-tight text-slate-900">
+                        {complaint.id}
+                      </p>
+
+                      <p className="mt-0.5 text-[10px] text-slate-400">
+                        {caseItem.alerts.length} linked alert
+                        {caseItem.alerts.length === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                  </div>
+                </td>
+
+                {/* Fraud / Amount */}
+                <td className="px-4 py-4">
+                  <p className="text-xs font-medium text-slate-800">
+                    {complaint.fraudType}
+                  </p>
+
+                  <p className="mt-1 text-[11px] tabular-nums text-slate-500">
+                    {formatCurrency(complaint.amount)}
+                  </p>
+                </td>
+
+                {/* Location */}
+                <td className="px-4 py-4">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                    <MapPin
+                      size={13}
+                      strokeWidth={1.8}
+                      className="shrink-0 text-slate-400"
+                    />
+                    <span>{complaint.location}</span>
+                  </div>
+                </td>
+
+                {/* Bank */}
+                <td className="px-4 py-4">
+                  <span className="text-xs font-medium text-slate-700">
+                    {complaint.bank}
+                  </span>
+                </td>
+
+                {/* Risk */}
+                <td className="px-4 py-4">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`min-w-[22px] text-sm font-bold tabular-nums ${riskScoreColor(
+                        complaint.riskScore
+                      )}`}
+                    >
+                      {complaint.riskScore}
+                    </span>
+
+                    {riskBadge(complaint.riskLevel)}
+                  </div>
+                </td>
+
+                {/* Status */}
+                <td className="px-4 py-4">
+                  <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-medium text-slate-600">
+                    {complaint.status}
+                  </span>
+                </td>
+
+                {/* Reported */}
+                <td className="px-5 py-4 text-right">
+                  <span className="text-[11px] font-medium tabular-nums text-slate-400">
+                    {complaint.reportedAt}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+
+    {filteredCases.length === 0 ? (
+      <div className="border-t border-slate-100 p-5">
+        <EmptyState message="No prototype cases match these filters. Reset the filter rail to restore the shared case set." />
+      </div>
+    ) : (
+      <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/30 px-5 py-3">
+        <span className="text-[10px] font-medium text-slate-400">
+          Showing{" "}
+          <span className="font-semibold text-slate-600">
+            {filteredCases.length}
+          </span>{" "}
+          of{" "}
+          <span className="font-semibold text-slate-600">
+            {complaints.length}
+          </span>{" "}
+          full cases
+        </span>
+      </div>
+    )}
+  </div>
+</section>
 
       {/* Analytics */}
       <section>
         <SectionHeader
-          eyebrow="Feature 02"
+          eyebrow="Case pattern signals"
           title="Fraud Pattern & Hotspot Analytics"
-          description="Derived views turn the complaint queue into pattern signals without introducing a second source of truth."
+          description=""
         />
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
@@ -608,47 +661,121 @@ export default function OverviewDashboard({ role }: OverviewDashboardProps) {
 
           {/* Fraud type */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[var(--trace-shadow-card)] xl:col-span-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-xs font-bold text-slate-900">Fraud-type mix</h3>
-                <p className="mt-1 text-[10px] text-slate-400">Complaint categories in view</p>
+  <div className="flex items-center justify-between">
+    <div>
+      <h3 className="text-xs font-bold text-slate-900">
+        Fraud-type mix
+      </h3>
+      <p className="mt-1 text-[10px] text-slate-400">
+        Complaint categories in view
+      </p>
+    </div>
+
+    <TrendingUp size={16} className="text-slate-400" />
+  </div>
+
+  {(() => {
+    const additionalFraudTypes = [
+      { name: "Phishing / Smishing", count: 31 },
+      { name: "Account Takeover", count: 18 },
+      { name: "Investment Scam", count: 14 },
+    
+    ];
+
+    // Combine your existing data with additional prototype categories.
+    // If a category already exists, keep the existing count.
+    const existingNames = new Set(
+      fraudDistribution.map((item) => item.name)
+    );
+
+    const combinedFraudTypes = [
+      ...fraudDistribution,
+      ...additionalFraudTypes.filter(
+        (item) => !existingNames.has(item.name)
+      ),
+    ]
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+
+    const total = combinedFraudTypes.reduce(
+      (sum, item) => sum + item.count,
+      0
+    );
+
+    return (
+      <div className="mt-5">
+        <div className="divide-y divide-slate-100">
+          {combinedFraudTypes.map((item, index) => {
+            const percentage = total
+              ? Math.round((item.count / total) * 100)
+              : 0;
+
+            return (
+              <div
+                key={item.name}
+                className="group flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+              >
+                {/* Rank */}
+                <span className="w-5 shrink-0 text-[9px] font-bold tabular-nums text-slate-300">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+
+                {/* Accent */}
+                <span
+                  className={`h-8 w-0.5 shrink-0 rounded-full ${
+                    index === 0
+                      ? "bg-cyan-500"
+                      : index === 1
+                        ? "bg-cyan-400"
+                        : "bg-slate-200"
+                  }`}
+                />
+
+                {/* Name + count */}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[11px] font-semibold text-slate-800">
+                    {item.name}
+                  </p>
+
+                  <p className="mt-0.5 text-[10px] text-slate-400">
+                    {item.count} case{item.count === 1 ? "" : "s"}
+                  </p>
+                </div>
+
+                {/* Percentage */}
+                <div className="text-right">
+                  <p
+                    className={`text-sm font-bold tabular-nums ${
+                      index === 0
+                        ? "text-cyan-700"
+                        : "text-slate-700"
+                    }`}
+                  >
+                    {percentage}%
+                  </p>
+
+                  <p className="text-[9px] uppercase tracking-wide text-slate-300">
+                    share
+                  </p>
+                </div>
               </div>
-              <TrendingUp size={16} className="text-slate-400" />
-            </div>
+            );
+          })}
+        </div>
 
-            <div className="mt-6 space-y-5">
-              {fraudDistribution.length ? (
-                fraudDistribution.map((item, index) => {
-                  const max = fraudDistribution[0]?.count ?? 1;
-                  return (
-                    <div key={item.name}>
-                      <div className="mb-1.5 flex items-center justify-between">
-                        <span className="text-[11px] font-semibold text-slate-700">
-                          {item.name}
-                        </span>
-                        <span className="text-[10px] font-bold text-slate-400">
-                          {item.count} case{item.count === 1 ? "" : "s"}
-                        </span>
-                      </div>
-                      <div className="h-7 rounded-lg bg-slate-50 p-1">
-                        <div
-                          className="flex h-full items-center rounded-md bg-gradient-to-r from-cyan-500 to-blue-600 px-2 text-[9px] font-bold text-white transition-all"
-                          style={{
-                            width: `${Math.max(18, (item.count / max) * 100)}%`,
-                          }}
-                        >
-                          {index === 0 ? "dominant signal" : "observed"}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <EmptyState message="No fraud-type data for the selected filters." />
-              )}
-            </div>
-          </div>
+        <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+          <span className="text-[10px] text-slate-400">
+            {combinedFraudTypes.length} categories
+          </span>
 
+          <span className="text-[10px] font-semibold text-slate-500">
+            {total} cases
+          </span>
+        </div>
+      </div>
+    );
+  })()}
+</div>
           {/* Geographic pressure */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[var(--trace-shadow-card)] xl:col-span-4">
             <div className="flex items-center justify-between">
@@ -807,32 +934,7 @@ export default function OverviewDashboard({ role }: OverviewDashboardProps) {
         </div>
       </section>
 
-      {/* Interpretation strip */}
-      <section className="rounded-2xl border border-slate-200 bg-slate-950 p-5 text-white shadow-[var(--trace-shadow-float)]">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-2xl">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-300">
-              TRACE intelligence loop
-            </p>
-            <h3 className="mt-1 text-sm font-bold">From complaint signal to intervention signal</h3>
-            <p className="mt-2 text-[11px] leading-5 text-slate-300">
-              Overview stays deliberately descriptive: it surfaces what happened, how risky the
-              complaint is, where predictive pressure is concentrated and when activity clusters.
-              The Predict & Investigate page can then take the selected case deeper.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2 text-[10px] font-semibold">
-            {["Complaint", "Risk", "Pattern", "Hotspot", "Time", "Prediction"].map((step, index) => (
-              <span
-                key={step}
-                className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-slate-300"
-              >
-                {index + 1}. {step}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
+     
     </div>
   );
 }

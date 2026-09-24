@@ -7,6 +7,7 @@ import {
   Pencil,
   Save,
   Target,
+  TrendingUp,
   X,
 } from "lucide-react";
 
@@ -27,12 +28,29 @@ import {
 
 const OUTCOME_STORAGE_KEY = "trace-outcome-log-v2";
 const OUTCOME_EVENT_NAME = "trace-outcome-updated";
+const HISTORY_STORAGE_KEY = "trace-accuracy-history-v1";
 
 type OutcomeTrackerProps = {
   outcome: Outcome;
   caseId: string;
   predictedLocations: PredictedLocation[];
 };
+
+type AccuracyPoint = {
+  label: string;
+  accuracy: number;
+};
+
+const initialHistory: AccuracyPoint[] = [
+  { label: "1", accuracy: 61 },
+  { label: "2", accuracy: 64 },
+  { label: "3", accuracy: 63 },
+  { label: "4", accuracy: 68 },
+  { label: "5", accuracy: 70 },
+  { label: "6", accuracy: 69 },
+  { label: "7", accuracy: 72 },
+  { label: "8", accuracy: 74 },
+];
 
 const outcomeOptions: {
   value: OutcomeStatus;
@@ -43,28 +61,28 @@ const outcomeOptions: {
   {
     value: "Correct",
     label: "Correct",
-    description: "Prediction matched the observed event.",
+    description: "Prediction matched.",
     classes:
       "border-green-200 bg-green-50 text-green-700 hover:bg-green-100",
   },
   {
     value: "Partial",
     label: "Partial",
-    description: "Location/time was close but not exact.",
+    description: "Close, but not exact.",
     classes:
       "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100",
   },
   {
     value: "Incorrect",
     label: "Incorrect",
-    description: "Observed event did not match the prediction.",
+    description: "Prediction did not match.",
     classes:
       "border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
   },
   {
     value: "Not Observed",
     label: "Not Observed",
-    description: "No field observation was available.",
+    description: "No field observation.",
     classes:
       "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100",
   },
@@ -73,25 +91,41 @@ const outcomeOptions: {
 function readStoredLog(): OutcomeLogItem[] {
   try {
     const stored = localStorage.getItem(OUTCOME_STORAGE_KEY);
-
-    if (!stored) {
-      return mockOutcomeLog;
-    }
+    if (!stored) return mockOutcomeLog;
 
     const parsed = JSON.parse(stored);
-
-    if (!Array.isArray(parsed)) {
-      return mockOutcomeLog;
-    }
-
-    return parsed;
+    return Array.isArray(parsed) ? parsed : mockOutcomeLog;
   } catch {
     return mockOutcomeLog;
   }
 }
 
+function readHistory(): AccuracyPoint[] {
+  try {
+    const stored = localStorage.getItem(HISTORY_STORAGE_KEY);
+    if (!stored) return initialHistory;
+
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed) && parsed.length
+      ? parsed
+      : initialHistory;
+  } catch {
+    return initialHistory;
+  }
+}
+
+function saveHistory(history: AccuracyPoint[]) {
+  localStorage.setItem(
+    HISTORY_STORAGE_KEY,
+    JSON.stringify(history),
+  );
+}
+
 function persistLog(log: OutcomeLogItem[]) {
-  localStorage.setItem(OUTCOME_STORAGE_KEY, JSON.stringify(log));
+  localStorage.setItem(
+    OUTCOME_STORAGE_KEY,
+    JSON.stringify(log),
+  );
 
   window.dispatchEvent(
     new CustomEvent(OUTCOME_EVENT_NAME, {
@@ -145,9 +179,11 @@ export function OutcomeTracker({
   const [actualLocation, setActualLocation] = useState("");
   const [actualTime, setActualTime] = useState("");
 
-  const [outcomeLog, setOutcomeLog] = useState<OutcomeLogItem[]>(
-    () => readStoredLog(),
-  );
+  const [outcomeLog, setOutcomeLog] =
+    useState<OutcomeLogItem[]>(readStoredLog);
+
+  const [history, setHistory] =
+    useState<AccuracyPoint[]>(readHistory);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState("");
@@ -171,7 +207,13 @@ export function OutcomeTracker({
   );
 
   const validatedCount =
-    counts.correct + counts.partial + counts.incorrect;
+    counts.correct +
+    counts.partial +
+    counts.incorrect;
+
+  const latestAccuracy =
+    history[history.length - 1]?.accuracy ??
+    currentAccuracy;
 
   useEffect(() => {
     if (
@@ -188,6 +230,98 @@ export function OutcomeTracker({
     }
   }, [predictedLocations, selectedPredictionId]);
 
+  // Keep accuracy history synced with saved outcomes.
+  useEffect(() => {
+    const handleOutcomeUpdate = (event: Event) => {
+      const customEvent =
+        event as CustomEvent<OutcomeLogItem[]>;
+
+      const nextLog =
+        customEvent.detail ?? readStoredLog();
+
+      setOutcomeLog(nextLog);
+
+      const nextAccuracy = calculateAccuracy(nextLog);
+
+      setHistory((currentHistory) => {
+        const last =
+          currentHistory[currentHistory.length - 1];
+
+        if (last?.accuracy === nextAccuracy) {
+          return currentHistory;
+        }
+
+        const nextHistory = [
+          ...currentHistory,
+          {
+            label: `${currentHistory.length + 1}`,
+            accuracy: nextAccuracy,
+          },
+        ];
+
+        saveHistory(nextHistory);
+        return nextHistory;
+      });
+    };
+
+    window.addEventListener(
+      OUTCOME_EVENT_NAME,
+      handleOutcomeUpdate,
+    );
+
+    return () =>
+      window.removeEventListener(
+        OUTCOME_EVENT_NAME,
+        handleOutcomeUpdate,
+      );
+  }, []);
+
+  const chartPoints = useMemo(() => {
+    const width = 760;
+    const height = 270;
+    const left = 42;
+    const right = 16;
+    const top = 18;
+    const bottom = 30;
+
+    const chartWidth = width - left - right;
+    const chartHeight = height - top - bottom;
+
+    return history.map((point, index) => ({
+      ...point,
+      x:
+        history.length === 1
+          ? width / 2
+          : left +
+            (index / (history.length - 1)) *
+              chartWidth,
+      y:
+        top +
+        ((100 - point.accuracy) / 100) *
+          chartHeight,
+    }));
+  }, [history]);
+
+  const linePath = chartPoints
+    .map((point, index) =>
+      index === 0
+        ? `M ${point.x} ${point.y}`
+        : `L ${point.x} ${point.y}`,
+    )
+    .join(" ");
+
+  const areaPath =
+    chartPoints.length > 0
+      ? `${linePath} L ${
+          chartPoints[chartPoints.length - 1].x
+        } 240 L ${chartPoints[0].x} 240 Z`
+      : "";
+
+  const resetHistory = () => {
+    localStorage.removeItem(HISTORY_STORAGE_KEY);
+    setHistory(initialHistory);
+  };
+
   const resetForm = () => {
     setSelectedStatus("Not Observed");
     setActualLocation("");
@@ -196,12 +330,12 @@ export function OutcomeTracker({
   };
 
   const handleSaveOutcome = () => {
-    if (!selectedPrediction) {
-      return;
-    }
+    if (!selectedPrediction) return;
 
     const existingIndex = editingId
-      ? outcomeLog.findIndex((item) => item.id === editingId)
+      ? outcomeLog.findIndex(
+          (item) => item.id === editingId,
+        )
       : -1;
 
     const nextItem: OutcomeLogItem = {
@@ -211,7 +345,8 @@ export function OutcomeTracker({
         outcome.predictionId || `PRED-${caseId}`,
       predictedLocationId: selectedPrediction.id,
       predictedLocationName: selectedPrediction.name,
-      predictedWindow: selectedPrediction.predictedWindow,
+      predictedWindow:
+        selectedPrediction.predictedWindow,
       actualLocation:
         actualLocation.trim() || undefined,
       actualTime: actualTime || undefined,
@@ -219,14 +354,12 @@ export function OutcomeTracker({
       recordedAt: formatRecordedAt(),
     };
 
-    let nextLog: OutcomeLogItem[];
+    const nextLog = [...outcomeLog];
 
     if (existingIndex >= 0) {
-      nextLog = [...outcomeLog];
       nextLog[existingIndex] = nextItem;
     } else {
-      // New outcomes are always added at the top.
-      nextLog = [nextItem, ...outcomeLog];
+      nextLog.unshift(nextItem);
     }
 
     setOutcomeLog(nextLog);
@@ -234,24 +367,26 @@ export function OutcomeTracker({
 
     setSuccessMessage(
       editingId
-        ? "Outcome updated successfully"
-        : "Outcome recorded successfully",
+        ? "Outcome updated"
+        : "Outcome recorded",
     );
 
     resetForm();
 
-    window.setTimeout(() => {
-      setSuccessMessage("");
-    }, 2500);
+    window.setTimeout(
+      () => setSuccessMessage(""),
+      2500,
+    );
   };
 
   const handleEdit = (item: OutcomeLogItem) => {
-    const matchingPrediction = predictedLocations.find(
-      (location) => location.id === item.predictedLocationId,
+    const prediction = predictedLocations.find(
+      (location) =>
+        location.id === item.predictedLocationId,
     );
 
-    if (matchingPrediction) {
-      setSelectedPredictionId(matchingPrediction.id);
+    if (prediction) {
+      setSelectedPredictionId(prediction.id);
     }
 
     setSelectedStatus(item.status);
@@ -268,79 +403,57 @@ export function OutcomeTracker({
   };
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      {/* Header */}
-      <div className="border-b border-slate-100 px-5 py-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      {/* Compact header */}
+      <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+        <div className="flex items-center gap-2">
+          <Target className="h-5 w-5 text-cyan-600" />
           <div>
-            <div className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-cyan-600" />
-
-              <h3 className="text-sm font-semibold text-slate-900">
-                Outcome & Learning Tracker
-              </h3>
-            </div>
-
-            <p className="mt-1 text-xs leading-5 text-slate-500">
-              Validate any predicted location against field
-              observations and feed the result back into the learning
-              loop.
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-cyan-100 bg-cyan-50/60 px-4 py-2 text-right">
-            <p className="text-[10px] uppercase tracking-wide text-cyan-600">
-              Current accuracy
-            </p>
-
-            <p className="text-lg font-bold text-slate-900">
-              {currentAccuracy}%
-            </p>
+            <h3 className="text-sm font-semibold text-slate-900">
+              Outcome & Learning
+            </h3>
+            
           </div>
         </div>
-      </div>
 
-      {/* Main 60 / 40 layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] lg:items-stretch">
+        <button
+          type="button"
+          onClick={resetHistory}
+          className="text-[10px] font-medium text-slate-400 hover:text-slate-700"
+        >
+          Reset trend
+        </button>
+      </header>
+
+      {/* Main section */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_1.35fr]">
         {/* LEFT — Outcome entry */}
         <div
           id="outcome-tracker-form"
-          className="space-y-5 p-5 lg:border-r lg:border-slate-100"
+          className="space-y-4 p-5 lg:border-r lg:border-slate-100"
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-600">
-                Validation
-              </p>
-
-              <p className="mt-1 text-xs text-slate-400">
-                Record what happened in the field.
-              </p>
-            </div>
-
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-500">
-              {validatedCount} validated
-            </span>
-          </div>
-
-          {/* Prediction selector */}
           <div>
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Prediction to validate
+            <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Prediction
             </label>
 
             <div className="relative">
               <select
                 value={selectedPredictionId}
                 onChange={(event) =>
-                  setSelectedPredictionId(event.target.value)
+                  setSelectedPredictionId(
+                    event.target.value,
+                  )
                 }
-                className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-3 pr-10 text-xs font-medium text-slate-800 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                className="w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 pr-9 text-xs text-slate-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
               >
                 {predictedLocations.map((location) => (
-                  <option key={location.id} value={location.id}>
+                  <option
+                    key={location.id}
+                    value={location.id}
+                  >
                     {location.name} — {location.area} ·{" "}
-                    {location.confidence}% confidence
+                    {location.confidence}%
                   </option>
                 ))}
               </select>
@@ -349,57 +462,52 @@ export function OutcomeTracker({
             </div>
           </div>
 
-          {/* Selected prediction */}
           {selectedPrediction && (
-            <div className="rounded-xl border border-cyan-100 bg-cyan-50/50 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="rounded-xl border border-cyan-100 bg-cyan-50/50 p-3">
+              <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">
+                  <p className="text-xs font-semibold text-slate-900">
                     {selectedPrediction.name}
                   </p>
-
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-0.5 text-[10px] text-slate-500">
                     {selectedPrediction.bank} ·{" "}
                     {selectedPrediction.area}
                   </p>
                 </div>
 
                 <span
-                  className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${getRiskClass(
+                  className={`rounded-full border px-2 py-1 text-[9px] font-semibold ${getRiskClass(
                     selectedPrediction.riskLevel,
                   )}`}
                 >
-                  {selectedPrediction.riskLevel} risk
+                  {selectedPrediction.riskLevel}
                 </span>
               </div>
 
-              <div className="mt-4 grid grid-cols-3 gap-3">
+              <div className="mt-3 grid grid-cols-3 gap-2">
                 <div>
-                  <p className="text-[10px] text-slate-400">
+                  <p className="text-[9px] text-slate-400">
                     Confidence
                   </p>
-
-                  <p className="mt-1 text-xs font-semibold text-slate-700">
+                  <p className="text-xs font-semibold text-slate-700">
                     {selectedPrediction.confidence}%
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-[10px] text-slate-400">
-                    Predicted window
+                  <p className="text-[9px] text-slate-400">
+                    Window
                   </p>
-
-                  <p className="mt-1 text-xs font-semibold text-slate-700">
+                  <p className="text-xs font-semibold text-slate-700">
                     {selectedPrediction.predictedWindow}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-[10px] text-slate-400">
-                    Location type
+                  <p className="text-[9px] text-slate-400">
+                    Type
                   </p>
-
-                  <p className="mt-1 text-xs font-semibold text-slate-700">
+                  <p className="text-xs font-semibold text-slate-700">
                     {selectedPrediction.type}
                   </p>
                 </div>
@@ -407,85 +515,74 @@ export function OutcomeTracker({
             </div>
           )}
 
-          {/* Actual observation */}
-          <div>
-            <div className="mb-2 flex items-center gap-2">
-              <MapPin className="h-3.5 w-3.5 text-slate-400" />
-
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Actual observed location
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                <MapPin className="h-3 w-3" />
+                Actual location
               </label>
+
+              <input
+                value={actualLocation}
+                onChange={(event) =>
+                  setActualLocation(event.target.value)
+                }
+                placeholder="e.g. HDFC ATM — Okhla"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-xs outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+              />
             </div>
 
-            <input
-              value={actualLocation}
-              onChange={(event) =>
-                setActualLocation(event.target.value)
-              }
-              placeholder="e.g. HDFC ATM — Okhla"
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-            />
-
-            <p className="mt-1 text-[10px] text-slate-400">
-              Leave empty when the field team could not establish the
-              actual location.
-            </p>
-          </div>
-
-          {/* Actual time */}
-          <div>
-            <div className="mb-2 flex items-center gap-2">
-              <Clock3 className="h-3.5 w-3.5 text-slate-400" />
-
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Actual observed time
+            <div>
+              <label className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                <Clock3 className="h-3 w-3" />
+                Actual time
               </label>
-            </div>
 
-            <input
-              type="time"
-              value={actualTime}
-              onChange={(event) =>
-                setActualTime(event.target.value)
-              }
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs text-slate-800 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-            />
+              <input
+                type="time"
+                value={actualTime}
+                onChange={(event) =>
+                  setActualTime(event.target.value)
+                }
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-xs outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+              />
+            </div>
           </div>
 
-          {/* Outcome buttons */}
           <div>
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
               Field outcome
             </label>
 
             <div className="grid grid-cols-2 gap-2">
               {outcomeOptions.map((option) => {
-                const active = selectedStatus === option.value;
+                const active =
+                  selectedStatus === option.value;
 
                 return (
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => setSelectedStatus(option.value)}
-                    className={`rounded-xl border p-3 text-left transition-all ${
+                    onClick={() =>
+                      setSelectedStatus(option.value)
+                    }
+                    className={`rounded-lg border p-2.5 text-left transition ${
                       active
-                        ? `${option.classes} ring-2 ring-offset-1 ring-cyan-100`
+                        ? `${option.classes} ring-2 ring-cyan-100`
                         : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold">
+                      <span className="text-[11px] font-semibold">
                         {option.label}
                       </span>
 
                       {active && (
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white">
-                          <Check className="h-3 w-3" />
-                        </span>
+                        <Check className="h-3.5 w-3.5" />
                       )}
                     </div>
 
-                    <p className="mt-1 text-[10px] leading-4 opacity-75">
+                    <p className="mt-0.5 text-[9px] opacity-70">
                       {option.description}
                     </p>
                   </button>
@@ -494,186 +591,259 @@ export function OutcomeTracker({
             </div>
           </div>
 
-          {/* Save */}
-          <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              {successMessage ? (
-                <div className="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-[11px] font-medium text-green-700">
-                  <Check className="h-3.5 w-3.5" />
-                  {successMessage}
-                </div>
-              ) : editingId ? (
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 hover:text-slate-700"
-                >
-                  <X className="h-3.5 w-3.5" />
-                  Cancel edit
-                </button>
-              ) : (
-                <p className="text-[10px] text-slate-400">
-                  Saving updates this browser session and the learning
-                  trend.
-                </p>
-              )}
-            </div>
+          <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+            {successMessage ? (
+              <span className="text-[10px] font-medium text-green-600">
+                ✓ {successMessage}
+              </span>
+            ) : editingId ? (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="flex items-center gap-1 text-[10px] text-slate-500"
+              >
+                <X className="h-3 w-3" />
+                Cancel
+              </button>
+            ) : (
+              <span className="text-[9px] text-slate-400">
+                Saved to this browser
+              </span>
+            )}
 
             <button
               type="button"
               onClick={handleSaveOutcome}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-[11px] font-semibold text-white hover:bg-slate-800"
             >
               {editingId ? (
-                <Pencil className="h-3.5 w-3.5" />
+                <Pencil className="h-3 w-3" />
               ) : (
-                <Save className="h-3.5 w-3.5" />
+                <Save className="h-3 w-3" />
               )}
 
-              {editingId ? "Update Outcome" : "Save Outcome"}
+              {editingId ? "Update" : "Save"}
             </button>
-          </div>
-
-          {/* Outcome summary */}
-          <div className="border-t border-slate-100 pt-4">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-xs font-semibold text-slate-700">
-                Outcome summary
-              </p>
-
-              <span className="text-[10px] text-slate-400">
-                {validatedCount} validated
-              </span>
-            </div>
-
-            <div className="grid grid-cols-4 gap-2">
-              <div className="rounded-xl border border-green-100 bg-green-50 p-2.5">
-                <p className="text-lg font-bold text-green-700">
-                  {counts.correct}
-                </p>
-
-                <p className="text-[9px] text-green-600">
-                  Correct
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-amber-100 bg-amber-50 p-2.5">
-                <p className="text-lg font-bold text-amber-700">
-                  {counts.partial}
-                </p>
-
-                <p className="text-[9px] text-amber-600">
-                  Partial
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-red-100 bg-red-50 p-2.5">
-                <p className="text-lg font-bold text-red-700">
-                  {counts.incorrect}
-                </p>
-
-                <p className="text-[9px] text-red-600">
-                  Incorrect
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-                <p className="text-lg font-bold text-slate-700">
-                  {counts.notObserved}
-                </p>
-
-                <p className="text-[9px] text-slate-500">
-                  Not observed
-                </p>
-              </div>
-            </div>
           </div>
         </div>
 
-        {/* RIGHT — Recent outcome log */}
-        <div className="flex min-h-0 flex-col bg-slate-50/40 p-5">
-          <div className="mb-4 flex shrink-0 items-start justify-between">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Activity
-              </p>
+        {/* RIGHT — Trend + stats + recent activity */}
+        <div className="min-w-0 bg-slate-50/40 p-5">
+          {/* Trend + stats in ONE row */}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_190px]">
+            {/* Graph */}
+            <div className="min-w-0">
+              <div className="mb-2 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-600">
+                    Accuracy trend
+                  </p>
+                  <p className="mt-0.5 text-[9px] text-slate-400">
+                    {history.length} checkpoints
+                  </p>
+                </div>
 
-              <h4 className="mt-1 text-sm font-semibold text-slate-800">
-                Recent outcome log
-              </h4>
+                <span className="text-lg font-bold text-slate-900">
+                  {latestAccuracy}%
+                </span>
+              </div>
+
+              <div className="h-[270px] overflow-hidden rounded-xl border border-slate-100 bg-white p-2">
+                <svg
+                  viewBox="0 0 760 270"
+                  className="h-full w-full"
+                  role="img"
+                  aria-label="Prediction accuracy trend"
+                >
+                  {[0, 25, 50, 75, 100].map(
+                    (value) => {
+                      const y =
+                        18 +
+                        ((100 - value) / 100) *
+                          222;
+
+                      return (
+                        <g key={value}>
+                          <line
+                            x1="42"
+                            y1={y}
+                            x2="744"
+                            y2={y}
+                            stroke="#e2e8f0"
+                            strokeWidth="1"
+                          />
+
+                          <text
+                            x="34"
+                            y={y + 3}
+                            textAnchor="end"
+                            className="fill-slate-400 text-[9px]"
+                          >
+                            {value}%
+                          </text>
+                        </g>
+                      );
+                    },
+                  )}
+
+                  {areaPath && (
+                    <path
+                      d={areaPath}
+                      fill="currentColor"
+                      className="text-cyan-50"
+                    />
+                  )}
+
+                  {linePath && (
+                    <path
+                      d={linePath}
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-cyan-500"
+                    />
+                  )}
+
+                  {chartPoints.map(
+                    (point, index) => (
+                      <g
+                        key={`${point.label}-${index}`}
+                      >
+                        <circle
+                          cx={point.x}
+                          cy={point.y}
+                          r="4"
+                          fill="white"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          className="text-cyan-500"
+                        />
+
+                        <text
+                          x={point.x}
+                          y="258"
+                          textAnchor="middle"
+                          className="fill-slate-400 text-[8px]"
+                        >
+                          {point.label}
+                        </text>
+                      </g>
+                    ),
+                  )}
+                </svg>
+              </div>
             </div>
 
-            <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[9px] font-semibold text-slate-500">
-              {outcomeLog.length} records
+            {/* Compact statistics */}
+            <div className="grid grid-cols-2 gap-2 xl:grid-cols-1">
+              <div className="rounded-xl border border-cyan-100 bg-cyan-50/60 p-3">
+                <p className="text-[9px] font-semibold uppercase tracking-wide text-cyan-700">
+                  Accuracy
+                </p>
+                <p className="mt-1 text-xl font-bold text-slate-900">
+                  {latestAccuracy}%
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-green-100 bg-green-50 p-3">
+                <p className="text-[9px] font-semibold uppercase tracking-wide text-green-700">
+                  Correct
+                </p>
+                <p className="mt-1 text-xl font-bold text-slate-900">
+                  {counts.correct}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-3">
+                <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">
+                  Validated
+                </p>
+                <p className="mt-1 text-xl font-bold text-slate-900">
+                  {validatedCount}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-3">
+                <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">
+                  Checkpoints
+                </p>
+                <p className="mt-1 text-xl font-bold text-slate-900">
+                  {history.length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Outcome breakdown */}
+          <div className="mt-4 flex items-center gap-2 border-t border-slate-200 pt-3">
+            <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+              Outcomes
+            </span>
+
+            <span className="rounded-full bg-green-50 px-2 py-1 text-[9px] font-semibold text-green-700">
+              Correct {counts.correct}
+            </span>
+
+            <span className="rounded-full bg-amber-50 px-2 py-1 text-[9px] font-semibold text-amber-700">
+              Partial {counts.partial}
+            </span>
+
+            <span className="rounded-full bg-red-50 px-2 py-1 text-[9px] font-semibold text-red-700">
+              Incorrect {counts.incorrect}
+            </span>
+
+            <span className="rounded-full bg-slate-100 px-2 py-1 text-[9px] font-semibold text-slate-500">
+              Not observed {counts.notObserved}
             </span>
           </div>
 
-          {/* Scrollable log — stays within the height of the tracker */}
-          <div className="min-h-0 flex-1 overflow-y-auto pr-1 lg:max-h-[760px]">
-            <div className="space-y-2">
-              {outcomeLog.slice(0, 20).map((item) => (
+          {/* Recent activity */}
+          <div className="mt-4 border-t border-slate-200 pt-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Recent outcomes
+              </p>
+
+              <span className="text-[9px] text-slate-400">
+                {outcomeLog.length} records
+              </span>
+            </div>
+
+            <div className="max-h-[180px] space-y-1.5 overflow-y-auto">
+              {outcomeLog.slice(0, 8).map((item) => (
                 <div
                   key={item.id}
-                  className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-slate-300"
+                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-semibold text-slate-800">
-                        {item.predictedLocationName}
-                      </p>
+                  <div className="min-w-0">
+                    <p className="truncate text-[10px] font-semibold text-slate-700">
+                      {item.predictedLocationName}
+                    </p>
 
-                      <p className="mt-1 text-[9px] text-slate-400">
-                        Predicted window: {item.predictedWindow}
-                      </p>
-                    </div>
+                    <p className="mt-0.5 text-[8px] text-slate-400">
+                      {item.recordedAt}
+                      {item.actualLocation
+                        ? ` · ${item.actualLocation}`
+                        : ""}
+                    </p>
+                  </div>
 
+                  <div className="flex shrink-0 items-center gap-2">
                     <span
-                      className={`shrink-0 rounded-full border px-2 py-1 text-[9px] font-semibold ${getOutcomeClass(
+                      className={`rounded-full border px-2 py-1 text-[8px] font-semibold ${getOutcomeClass(
                         item.status,
                       )}`}
                     >
                       {item.status}
                     </span>
-                  </div>
-
-                  <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-2.5">
-                    {item.actualLocation && (
-                      <div className="flex items-start gap-2">
-                        <MapPin className="mt-0.5 h-3 w-3 shrink-0 text-slate-400" />
-
-                        <p className="text-[10px] text-slate-500">
-                          <span className="font-medium text-slate-600">
-                            Actual:
-                          </span>{" "}
-                          {item.actualLocation}
-                        </p>
-                      </div>
-                    )}
-
-                    {item.actualTime && (
-                      <div className="flex items-center gap-2">
-                        <Clock3 className="h-3 w-3 shrink-0 text-slate-400" />
-
-                        <p className="text-[10px] text-slate-500">
-                          <span className="font-medium text-slate-600">
-                            Time:
-                          </span>{" "}
-                          {item.actualTime}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
-                    <p className="text-[9px] text-slate-400">
-                      {item.recordedAt}
-                    </p>
 
                     <button
                       type="button"
                       onClick={() => handleEdit(item)}
+                      className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                       title="Edit outcome"
-                      className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-400 transition hover:border-slate-300 hover:text-slate-700"
                     >
                       <Pencil className="h-3 w-3" />
                     </button>
@@ -682,40 +852,17 @@ export function OutcomeTracker({
               ))}
 
               {outcomeLog.length === 0 && (
-                <div className="flex min-h-[300px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white">
-                  <div className="text-center">
-                    <Target className="mx-auto h-5 w-5 text-slate-300" />
-
-                    <p className="mt-2 text-xs font-medium text-slate-500">
-                      No outcomes recorded yet
-                    </p>
-
-                    <p className="mt-1 text-[10px] text-slate-400">
-                      Saved field observations will appear here.
-                    </p>
-                  </div>
+                <div className="rounded-lg border border-dashed border-slate-200 bg-white py-6 text-center">
+                  <p className="text-[10px] text-slate-400">
+                    No outcomes recorded yet
+                  </p>
                 </div>
               )}
             </div>
           </div>
-
-          <div className="mt-4 shrink-0 rounded-xl border border-cyan-100 bg-cyan-50/60 p-3">
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
-
-              <p className="text-[10px] font-semibold text-cyan-700">
-                Learning signal
-              </p>
-            </div>
-
-            <p className="mt-1 text-[10px] leading-4 text-cyan-700/70">
-              Each saved observation updates the accuracy trend
-              below in real time.
-            </p>
-          </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 

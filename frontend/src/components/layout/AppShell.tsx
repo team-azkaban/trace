@@ -6,15 +6,14 @@ import Navbar, { type UserRole } from "../navigation/Navbar";
 import OverviewPage from "../../pages/OverviewPage";
 import PredictInvestigatePage from "../../pages/PredictInvestigatePage";
 import ResponsePage from "../../pages/ResponsePage";
-
+import LocationInvestigationPage from "../../pages/LocationInvestigationPage";
 import { mockCases } from "../../data/cases.mock";
-
+import CoverageSimulatorPage from "../../pages/CoverageSimulatorPage";
 export type Tab = "overview" | "predict" | "response";
 
 export default function AppShell() {
   const [role, setRole] = useState<UserRole>("lea");
 
-  // Shared case selection across the entire dashboard
   const [selectedCaseId, setSelectedCaseId] = useState(
     mockCases[0].complaint.id,
   );
@@ -51,6 +50,12 @@ export default function AppShell() {
           }
         />
 
+        {/* Location Investigation */}
+        <Route
+          path="location-investigation/:locationId"
+          element={<LocationInvestigationPage />}
+        />
+
         {/* Response */}
         <Route
           path="response"
@@ -62,7 +67,10 @@ export default function AppShell() {
             />
           }
         />
-
+<Route
+  path="coverage-simulator/:caseId"
+  element={<CoverageSimulatorPage />}
+/>
         {/* Unknown dashboard route */}
         <Route
           path="*"

@@ -3,8 +3,7 @@ import PageContainer from "../components/layout/PageContainer";
 import CaseSelector from "../components/ui/CaseSelector";
 import { mockCases } from "../data/cases.mock";
 import MoneyFlowGraph from "../features/money-flow/MoneyFlowGraph";
-import ExplainabilityPanel from "../features/explainability/explainabilitypanel";
-import CCTVPanel from "../features/cctv/cctvpanel";
+
 import VaniaPredictiveLocation from "../features/predictive_location/VaniaPredictiveLocation";
 import {
   AlertTriangle,
@@ -132,13 +131,10 @@ export default function PredictInvestigatePage({
 
       {/* Prediction + GIS */}
       <section className="mb-7">
-        <SectionHeading
-          title="Cash-out Prediction"
-          description="Reserved for predicted withdrawal locations, confidence and time-window intelligence."
-        />
+        
 
         <div className="mt-3 grid grid-cols-1">
-          <div className="min-h-[480px] rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="min-h-[400px] rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <VaniaPredictiveLocation />
           </div>
         </div>
@@ -153,21 +149,7 @@ export default function PredictInvestigatePage({
 />
       </section>
 
-      {/* Supporting Intelligence */}
-      <section>
-        <SectionHeading
-          title="Supporting Intelligence"
-          description="Evidence behind the prediction and physical intelligence around the predicted location."
-        />
-
-        <div className="mt-3 grid grid-cols-1 gap-5 lg:grid-cols-2">
-
-          <ExplainabilityPanel />
-
-          <CCTVPanel />
-
-        </div>
-      </section>
+    
     </PageContainer>
   );
 }

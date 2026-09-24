@@ -50,9 +50,9 @@ export default function ResponsePage({
   return (
     <PageContainer>
       {/* Page Header */}
-      <section className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="relative px-5 py-6 sm:px-7">
-          <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-cyan-100/60 blur-3xl" />
+      <section className=" overflow-hidden ">
+        <div className="relative">
+          <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full " />
           <div className="relative flex items-end justify-between gap-6">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-600">
@@ -63,10 +63,7 @@ export default function ResponsePage({
               Response
             </h1>
 
-            <p className="mt-1 max-w-2xl text-sm text-slate-500">
-              Convert predictive intelligence into coordinated,
-              actionable intervention.
-            </p>
+          
           </div>
 
           <div className="hidden rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-500 shadow-sm md:block">
@@ -100,13 +97,7 @@ export default function ResponsePage({
             />
           </section>
 
-
-          <div className="relative mt-6 grid grid-cols-2 gap-3 border-t border-slate-100 pt-5 sm:grid-cols-4">
-            <ResponseMetric icon={<ShieldAlert size={14} />} label="Risk score" value={`${selectedCase.complaint.riskScore}/100`} accent="text-red-600" />
-            <ResponseMetric icon={<Activity size={14} />} label="Alert confidence" value={`${activeAlert.confidence}%`} accent="text-cyan-600" />
-            <ResponseMetric icon={<ClipboardCheck size={14} />} label="Workflow stage" value={role === "lea" ? "Assign" : "Monitor"} accent="text-violet-600" />
-            <ResponseMetric icon={<ArrowUpRight size={14} />} label="Predicted window" value={activeAlert.predictedWindow} accent="text-amber-600" />
-          </div>
+        
         </div>
       </section>
 
@@ -158,8 +149,8 @@ export default function ResponsePage({
           }
           description={
             role === "lea"
-              ? "Move high-risk cases from assignment through acknowledgement to investigation closure."
-              : "Move predicted withdrawal alerts from monitoring to bank acknowledgement."
+              ? ""
+              : ""
           }
         />
 
@@ -186,7 +177,6 @@ export default function ResponsePage({
             predictedLocations={selectedCase.predictedLocations}
           />
 
-          <AccuracyTrend />
         </div>
       </section>
     </PageContainer>
